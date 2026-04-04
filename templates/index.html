@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DPI Engine — Deep Packet Inspection System</title>
+<meta name="description" content="Analyze and filter network traffic with AI-powered Deep Packet Inspection. Upload PCAP files, block apps/IPs/domains, and get detailed statistics."/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #050810;
+    --surface: rgba(255,255,255,0.04);
+    --surface2: rgba(255,255,255,0.07);
+    --border: rgba(255,255,255,0.08);
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --danger: #ef4444;
+    --warn: #f59e0b;
+    --text: #f1f5f9;
+    --text-muted: #64748b;
+    --glow: 0 0 40px rgba(0,212,255,0.15);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:'Inter',sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+
+  /* Animated Background */
+  .bg-grid{
+    position:fixed;inset:0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size:60px 60px;
+    pointer-events:none;
+    z-index:0;
+  }
+  .bg-orb{
+    position:fixed;
+    border-radius:50%;
+    filter:blur(100px);
+    pointer-events:none;
+    z-index:0;
+    animation:pulse-orb 8s ease-in-out infinite;
+  }
+  .orb1{width:600px;height:600px;top:-200px;right:-200px;background:rgba(124,58,237,0.12);}
+  .orb2{width:500px;height:500px;bottom:-200px;left:-200px;background:rgba(0,212,255,0.08);animation-delay:4s;}
+  @keyframes pulse-orb{0%,100%{opacity:0.6;transform:scale(1);}50%{opacity:1;transform:scale(1.1);}}
+
+  /* Layout */
+  .container{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:0 24px;}
+
+  /* Header */
+  header{padding:32px 0 24px;}
+  .nav{display:flex;align-items:center;justify-content:space-between;}
+  .logo{display:flex;align-items:center;gap:12px;}
+  .logo-icon{
+    width:44px;height:44px;border-radius:12px;
+    background:linear-gradient(135deg,var(--accent2),var(--accent));
+    display:flex;align-items:center;justify-content:center;
+    font-size:20px;box-shadow:0 0 20px rgba(0,212,255,0.3);
+  }
+  .logo-text{font-size:20px;font-weight:800;letter-spacing:-0.5px;}
+  .logo-text span{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .badge{
+    padding:4px 12px;border-radius:999px;font-size:11px;font-weight:600;
+    background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);
+    color:var(--accent);letter-spacing:1px;text-transform:uppercase;
+  }
+
+  /* Hero */
+  .hero{padding:48px 0 40px;text-align:center;}
+  .hero h1{font-size:clamp(32px,5vw,56px);font-weight:800;letter-spacing:-2px;line-height:1.1;margin-bottom:16px;}
+  .hero h1 .gradient{background:linear-gradient(90deg,var(--accent),var(--accent2),var(--accent));background-size:200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 4s linear infinite;}
+  @keyframes shimmer{0%{background-position:0%;}100%{background-position:200%;}}
+  .hero p{font-size:17px;color:var(--text-muted);max-width:560px;margin:0 auto 32px;line-height:1.7;}
+
+  /* Feature pills */
+  .pills{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:48px;}
+  .pill{
+    display:flex;align-items:center;gap:6px;
+    padding:6px 14px;border-radius:999px;font-size:13px;font-weight:500;
+    background:var(--surface);border:1px solid var(--border);
+    color:var(--text-muted);
+  }
+  .pill .dot{width:6px;height:6px;border-radius:50%;background:var(--accent3);}
+
+  /* Upload Zone */
+  .upload-section{margin-bottom:32px;}
+  .upload-zone{
+    border:2px dashed var(--border);
+    border-radius:20px;
+    padding:56px 32px;
+    text-align:center;
+    background:var(--surface);
+    cursor:pointer;
+    transition:all 0.3s ease;
+    position:relative;
+    overflow:hidden;
+  }
+  .upload-zone::before{
+    content:'';position:absolute;inset:0;
+    background:linear-gradient(135deg,rgba(0,212,255,0.05),rgba(124,58,237,0.05));
+    opacity:0;transition:opacity 0.3s;
+  }
+  .upload-zone:hover,.upload-zone.drag-over{
+    border-color:var(--accent);
+    box-shadow:0 0 40px rgba(0,212,255,0.1);
+  }
+  .upload-zone:hover::before,.upload-zone.drag-over::before{opacity:1;}
+  .upload-icon{font-size:48px;margin-bottom:16px;display:block;}
+  .upload-zone h3{font-size:20px;font-weight:600;margin-bottom:8px;}
+  .upload-zone p{color:var(--text-muted);font-size:14px;}
+  .upload-zone p span{color:var(--accent);}
+  #fileInput{display:none;}
+  .file-selected{
+    margin-top:16px;padding:10px 20px;
+    background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);
+    border-radius:10px;display:inline-flex;align-items:center;gap:8px;
+    font-size:13px;color:var(--accent3);font-family:'JetBrains Mono',monospace;
+  }
+
+  /* Config Panel */
+  .config-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;}
+  @media(max-width:640px){.config-grid{grid-template-columns:1fr;}}
+  .config-card{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:16px;padding:20px;
+  }
+  .config-card h4{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:14px;}
+  .input-group{margin-bottom:12px;}
+  .input-group label{font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;}
+  .input-group input,.input-group select{
+    width:100%;padding:10px 14px;border-radius:10px;
+    background:rgba(255,255,255,0.05);border:1px solid var(--border);
+    color:var(--text);font-size:13px;font-family:'Inter',sans-serif;
+    outline:none;transition:border-color 0.2s;
+  }
+  .input-group input:focus,.input-group select:focus{border-color:var(--accent);}
+  .input-group input::placeholder{color:var(--text-muted);}
+  .input-group select option{background:#1e293b;}
+
+  /* App checkboxes */
+  .app-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;grid-column:1/-1;}
+  .app-chip{
+    display:flex;align-items:center;gap:8px;
+    padding:8px 12px;border-radius:10px;
+    background:var(--surface);border:1px solid var(--border);
+    cursor:pointer;font-size:12px;font-weight:500;
+    transition:all 0.2s;user-select:none;
+  }
+  .app-chip:hover{border-color:var(--accent);background:rgba(0,212,255,0.05);}
+  .app-chip input[type=checkbox]{display:none;}
+  .app-chip.selected{
+    background:rgba(0,212,255,0.1);border-color:rgba(0,212,255,0.4);
+    color:var(--accent);
+  }
+  .chip-icon{font-size:16px;}
+
+  /* Submit Button */
+  .btn-analyze{
+    width:100%;padding:18px;border-radius:14px;font-size:16px;font-weight:700;
+    background:linear-gradient(135deg,var(--accent2),var(--accent));
+    border:none;color:#fff;cursor:pointer;letter-spacing:0.5px;
+    transition:all 0.3s ease;position:relative;overflow:hidden;
+    box-shadow:0 4px 24px rgba(0,212,255,0.2);
+  }
+  .btn-analyze:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,212,255,0.35);}
+  .btn-analyze:active{transform:translateY(0);}
+  .btn-analyze:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
+  .btn-analyze .shine{
+    position:absolute;inset:0;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,0.15),transparent);
+    transform:translateX(-100%);
+    animation:shine 2s infinite;
+  }
+  @keyframes shine{0%{transform:translateX(-100%);}100%{transform:translateX(100%);}}
+
+  /* Processing */
+  .processing{
+    display:none;padding:40px;text-align:center;
+    background:var(--surface);border:1px solid var(--border);border-radius:20px;
+    margin-bottom:32px;
+  }
+  .spinner{
+    width:56px;height:56px;border-radius:50%;
+    border:3px solid rgba(0,212,255,0.1);
+    border-top-color:var(--accent);
+    animation:spin 0.8s linear infinite;
+    margin:0 auto 20px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .processing h3{font-size:18px;font-weight:600;margin-bottom:8px;}
+  .processing p{color:var(--text-muted);font-size:14px;}
+
+  /* Results */
+  .results{display:none;}
+  .results-header{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:24px;flex-wrap:wrap;gap:12px;
+  }
+  .results-header h2{font-size:22px;font-weight:700;}
+  .success-badge{
+    display:flex;align-items:center;gap:6px;
+    padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;
+    background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);color:var(--accent3);
+  }
+
+  /* Stats Grid */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:24px;}
+  .stat-card{
+    background:var(--surface);border:1px solid var(--border);border-radius:16px;
+    padding:20px;transition:transform 0.2s,box-shadow 0.2s;
+  }
+  .stat-card:hover{transform:translateY(-2px);box-shadow:var(--glow);}
+  .stat-card.highlight{background:linear-gradient(135deg,rgba(0,212,255,0.08),rgba(124,58,237,0.08));border-color:rgba(0,212,255,0.2);}
+  .stat-card.danger{background:rgba(239,68,68,0.06);border-color:rgba(239,68,68,0.15);}
+  .stat-card.success{background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.15);}
+  .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:600;margin-bottom:10px;}
+  .stat-value{font-size:28px;font-weight:800;font-family:'JetBrains Mono',monospace;letter-spacing:-1px;}
+  .stat-value.cyan{color:var(--accent);}
+  .stat-value.green{color:var(--accent3);}
+  .stat-value.red{color:var(--danger);}
+  .stat-value.purple{color:#a78bfa;}
+  .stat-sub{font-size:12px;color:var(--text-muted);margin-top:4px;}
+
+  /* App Breakdown */
+  .breakdown-card{
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:20px;padding:24px;margin-bottom:24px;
+  }
+  .breakdown-card h3{font-size:16px;font-weight:600;margin-bottom:20px;}
+  .app-row{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+  .app-row-name{font-size:13px;font-weight:500;min-width:110px;}
+  .bar-track{flex:1;height:8px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width 1s ease;}
+  .app-row-count{font-size:12px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;min-width:40px;text-align:right;}
+
+  /* Download + Log */
+  .action-row{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;}
+  .btn-download{
+    flex:1;min-width:200px;padding:14px 24px;border-radius:12px;font-size:14px;font-weight:600;
+    background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);
+    color:var(--accent3);cursor:pointer;text-align:center;transition:all 0.2s;
+    text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .btn-download:hover{background:rgba(16,185,129,0.2);box-shadow:0 0 20px rgba(16,185,129,0.15);}
+  .btn-reset{
+    padding:14px 24px;border-radius:12px;font-size:14px;font-weight:600;
+    background:var(--surface);border:1px solid var(--border);
+    color:var(--text-muted);cursor:pointer;transition:all 0.2s;
+  }
+  .btn-reset:hover{border-color:var(--accent);color:var(--text);}
+
+  .log-card{
+    background:rgba(0,0,0,0.4);border:1px solid var(--border);
+    border-radius:16px;padding:20px;font-family:'JetBrains Mono',monospace;
+    font-size:11px;color:#64748b;max-height:200px;overflow-y:auto;line-height:1.8;
+  }
+  .log-card h4{font-size:13px;color:var(--text-muted);margin-bottom:12px;font-family:'Inter',sans-serif;}
+  .log-line{margin-bottom:2px;}
+  .log-line.ok{color:#34d399;}
+  .log-line.err{color:#f87171;}
+
+  /* Footer */
+  footer{padding:32px 0;text-align:center;color:var(--text-muted);font-size:13px;border-top:1px solid var(--border);margin-top:40px;}
+  footer a{color:var(--accent);text-decoration:none;}
+
+  /* Toast */
+  .toast{
+    position:fixed;bottom:24px;right:24px;z-index:100;
+    padding:14px 20px;border-radius:12px;font-size:14px;font-weight:500;
+    background:#1e293b;border:1px solid var(--border);
+    transform:translateY(80px);opacity:0;transition:all 0.3s;
+  }
+  .toast.show{transform:translateY(0);opacity:1;}
+  .toast.error{border-color:rgba(239,68,68,0.3);color:var(--danger);}
+  .toast.success{border-color:rgba(16,185,129,0.3);color:var(--accent3);}
+
+  /* Scrollbar */
+  ::-webkit-scrollbar{width:6px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:999px;}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-orb orb1"></div>
+<div class="bg-orb orb2"></div>
+
+<div class="container">
+  <header>
+    <nav class="nav">
+      <div class="logo">
+        <div class="logo-icon">🛡️</div>
+        <span class="logo-text">DPI <span>Engine</span></span>
+      </div>
+      <div class="badge">v1.0</div>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>Deep Packet<br/><span class="gradient">Inspection Engine</span></h1>
+    <p>Upload a PCAP file to analyze network traffic, detect applications, and filter packets with multi-threaded precision.</p>
+    <div class="pills">
+      <div class="pill"><span class="dot"></span> Multi-threaded</div>
+      <div class="pill"><span class="dot"></span> SNI Detection</div>
+      <div class="pill"><span class="dot"></span> App Classification</div>
+      <div class="pill"><span class="dot"></span> Rule-based Filtering</div>
+    </div>
+  </section>
+
+  <!-- Upload -->
+  <div class="upload-section">
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+      <span class="upload-icon">📂</span>
+      <h3>Drop your PCAP file here</h3>
+      <p>Click to browse or drag & drop — <span>.pcap / .pcapng</span> files up to 50MB</p>
+      <div class="file-selected" id="fileSelected" style="display:none">
+        <span>📄</span><span id="fileName"></span>
+      </div>
+    </div>
+    <input type="file" id="fileInput" accept=".pcap,.pcapng" onchange="handleFile(event)"/>
+  </div>
+
+  <!-- Config -->
+  <div class="config-grid" id="configPanel">
+    <div class="config-card">
+      <h4>🚫 Blocking Rules</h4>
+      <div class="input-group">
+        <label>Block IPs (comma-separated)</label>
+        <input type="text" id="blockIps" placeholder="192.168.1.50, 10.0.0.1"/>
+      </div>
+      <div class="input-group">
+        <label>Block Domains (wildcards OK)</label>
+        <input type="text" id="blockDomains" placeholder="*.tiktok.com, ads.example.com"/>
+      </div>
+    </div>
+    <div class="config-card">
+      <h4>⚙️ Engine Config</h4>
+      <div class="input-group">
+        <label>Load Balancer Threads</label>
+        <select id="lbs">
+          <option value="1">1 LB Thread</option>
+          <option value="2" selected>2 LB Threads</option>
+          <option value="4">4 LB Threads</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>Fast Path Threads per LB</label>
+        <select id="fps">
+          <option value="1">1 FP Thread</option>
+          <option value="2" selected>2 FP Threads</option>
+          <option value="4">4 FP Threads</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="config-card" style="grid-column:1/-1">
+      <h4>📱 Block Applications</h4>
+      <div class="app-grid" id="appGrid">
+        {% set app_icons = {
+          'Google': '🔍', 'YouTube': '▶️', 'Facebook': '👤',
+          'Instagram': '📷', 'Twitter/X': '🐦', 'Netflix': '🎬',
+          'Amazon': '📦', 'Microsoft': '🪟', 'Apple': '🍎',
+          'WhatsApp': '💬', 'Telegram': '✈️', 'TikTok': '🎵',
+          'Spotify': '🎧', 'Zoom': '📹', 'Discord': '🎮', 'GitHub': '🐙'
+        } %}
+        {% for app in supported_apps %}
+        <label class="app-chip" id="chip-{{ loop.index }}" onclick="toggleChip(this)">
+          <input type="checkbox" value="{{ app }}"/>
+          <span class="chip-icon">{{ app_icons.get(app, '🔒') }}</span>
+          <span>{{ app }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-analyze" id="analyzeBtn" onclick="startAnalysis()" disabled>
+    <span class="shine"></span>
+    🔍 Analyze Packets
+  </button>
+
+  <!-- Processing -->
+  <div class="processing" id="processingPanel">
+    <div class="spinner"></div>
+    <h3>Analyzing Network Traffic...</h3>
+    <p>Multi-threaded DPI engine is processing your packets</p>
+    <p style="margin-top:8px;font-size:12px;font-family:'JetBrains Mono',monospace;color:#334155;" id="statusTicker">Initializing...</p>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="resultsPanel">
+    <div class="results-header">
+      <h2>📊 Analysis Results</h2>
+      <div class="success-badge">✅ Processing Complete</div>
+    </div>
+
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <div class="breakdown-card" id="breakdownCard" style="display:none">
+      <h3>🔎 Application Traffic Breakdown</h3>
+      <div id="appBreakdown"></div>
+    </div>
+
+    <div class="action-row">
+      <a class="btn-download" id="downloadBtn" href="#" download>
+        ⬇️ Download Filtered PCAP
+      </a>
+      <button class="btn-reset" onclick="resetUI()">↩️ Analyze Another</button>
+    </div>
+
+    <div class="log-card" id="logCard">
+      <h4>📋 Engine Log</h4>
+      <div id="logLines"></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="container">
+    Built with Python · Flask · Scapy &nbsp;|&nbsp;
+    <a href="https://github.com" target="_blank">View Source on GitHub</a>
+  </div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let selectedFile = null;
+  let currentJobId = null;
+  let pollInterval = null;
+
+  const uploadZone = document.getElementById('uploadZone');
+
+  uploadZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    uploadZone.classList.add('drag-over');
+  });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) setFile(file);
+  });
+
+  function handleFile(e) {
+    const file = e.target.files[0];
+    if (file) setFile(file);
+  }
+
+  function setFile(file) {
+    selectedFile = file;
+    document.getElementById('fileName').textContent = file.name + ' (' + formatBytes(file.size) + ')';
+    document.getElementById('fileSelected').style.display = 'inline-flex';
+    document.getElementById('analyzeBtn').disabled = false;
+  }
+
+  function toggleChip(el) {
+    el.classList.toggle('selected');
+    const cb = el.querySelector('input[type=checkbox]');
+    cb.checked = !cb.checked;
+  }
+
+  function getSelectedApps() {
+    return [...document.querySelectorAll('.app-chip.selected input')].map(i => i.value);
+  }
+
+  async function startAnalysis() {
+    if (!selectedFile) return;
+
+    const formData = new FormData();
+    formData.append('pcap', selectedFile);
+    formData.append('block_ips', document.getElementById('blockIps').value);
+    formData.append('block_domains', document.getElementById('blockDomains').value);
+    formData.append('block_apps', getSelectedApps().join(','));
+    formData.append('lbs', document.getElementById('lbs').value);
+    formData.append('fps', document.getElementById('fps').value);
+
+    document.getElementById('analyzeBtn').disabled = true;
+    document.getElementById('configPanel').style.opacity = '0.4';
+    document.getElementById('configPanel').style.pointerEvents = 'none';
+    document.getElementById('processingPanel').style.display = 'block';
+    document.getElementById('resultsPanel').style.display = 'none';
+
+    try {
+      const res = await fetch('/analyze', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.error) { showToast(data.error, 'error'); resetUI(); return; }
+      currentJobId = data.job_id;
+      pollResult();
+    } catch(e) {
+      showToast('Upload failed: ' + e.message, 'error');
+      resetUI();
+    }
+  }
+
+  const tickers = ['Parsing packets...', 'Running DPI engine...', 'Classifying applications...', 'Applying rules...', 'Writing output...'];
+  let tickIdx = 0;
+  function pollResult() {
+    const ticker = document.getElementById('statusTicker');
+    pollInterval = setInterval(async () => {
+      ticker.textContent = tickers[tickIdx++ % tickers.length];
+      try {
+        const res = await fetch('/result/' + currentJobId);
+        const data = await res.json();
+        if (data.status === 'done') {
+          clearInterval(pollInterval);
+          showResults(data);
+        } else if (data.status === 'error') {
+          clearInterval(pollInterval);
+          showToast('Error: ' + (data.message || 'Unknown error'), 'error');
+          resetUI();
+        }
+      } catch(e) {}
+    }, 1500);
+  }
+
+  function showResults(data) {
+    document.getElementById('processingPanel').style.display = 'none';
+    document.getElementById('resultsPanel').style.display = 'block';
+
+    const s = data.stats;
+    const statsGrid = document.getElementById('statsGrid');
+    statsGrid.innerHTML = `
+      ${statCard('Total Packets', s.total_packets.toLocaleString(), 'cyan', 'highlight', `${formatBytes(s.total_bytes)} total`)}
+      ${statCard('Forwarded', s.forwarded_packets.toLocaleString(), 'green', 'success', `${s.tcp_packets} TCP · ${s.udp_packets} UDP`)}
+      ${statCard('Blocked', s.dropped_packets.toLocaleString(), 'red', 'danger', `${s.drop_rate}% drop rate`)}
+      ${statCard('Connections', s.active_connections.toLocaleString(), 'purple', '', 'Active flows tracked')}
+      ${statCard('FP Processed', s.fp_processed.toLocaleString(), 'cyan', '', `${s.fp_forwarded} fwd · ${s.fp_dropped} drop`)}
+      ${statCard('LB Dispatched', s.lb_dispatched.toLocaleString(), 'purple', '', `${s.lb_received} received`)}
+    `;
+
+    const breakdown = data.app_breakdown;
+    if (breakdown && Object.keys(breakdown).length > 0) {
+      const bd = document.getElementById('breakdownCard');
+      bd.style.display = 'block';
+      const max = Math.max(...Object.values(breakdown));
+      document.getElementById('appBreakdown').innerHTML = Object.entries(breakdown)
+        .sort((a,b) => b[1]-a[1])
+        .map(([name, count]) => `
+          <div class="app-row">
+            <div class="app-row-name">${name}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${Math.round(count/max*100)}%"></div></div>
+            <div class="app-row-count">${count}</div>
+          </div>
+        `).join('');
+    }
+
+    document.getElementById('downloadBtn').href = '/download/' + currentJobId;
+
+    const logLines = document.getElementById('logLines');
+    const log = data.log || [];
+    logLines.innerHTML = log.map(l => {
+      const cls = l.includes('Error') || l.includes('error') ? 'err' : l.includes('✓') || l.includes('success') ? 'ok' : '';
+      return `<div class="log-line ${cls}">${escapeHtml(l)}</div>`;
+    }).join('');
+
+    showToast('Analysis complete!', 'success');
+  }
+
+  function statCard(label, value, colorClass, cardClass, sub) {
+    return `
+      <div class="stat-card ${cardClass}">
+        <div class="stat-label">${label}</div>
+        <div class="stat-value ${colorClass}">${value}</div>
+        <div class="stat-sub">${sub}</div>
+      </div>`;
+  }
+
+  function resetUI() {
+    clearInterval(pollInterval);
+    document.getElementById('processingPanel').style.display = 'none';
+    document.getElementById('resultsPanel').style.display = 'none';
+    document.getElementById('analyzeBtn').disabled = !selectedFile;
+    document.getElementById('configPanel').style.opacity = '1';
+    document.getElementById('configPanel').style.pointerEvents = 'auto';
+  }
+
+  function showToast(msg, type='') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast ' + type + ' show';
+    setTimeout(() => t.classList.remove('show'), 3500);
+  }
+
+  function formatBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+    return (b/1024/1024).toFixed(2) + ' MB';
+  }
+
+  function escapeHtml(t) {
+    return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>
